@@ -1,0 +1,2178 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitor Sísmico SVD/POD — Ingeniería Estructural (Zhao et al., 2022)</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            eng: {
+              blue: '#2563eb',
+              emerald: '#10b981',
+              red: '#ef4444',
+              bg: '#f8fafc',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Plotly.js CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+  <style>
+    /* Custom sleek scrollbars & range sliders */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: #475569;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+    }
+    .dark input[type="range"]::-webkit-slider-runnable-track {
+      background: #334155;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 9999px;
+      background: #2563eb;
+      margin-top: -5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+
+<body class="bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white transition-colors duration-200">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-30 hidden lg:hidden transition-opacity"></div>
+
+  <div class="flex min-h-screen">
+
+    <!-- ===================================================================== -->
+    <!-- PANEL LATERAL IZQUIERDO: PARÁMETROS Y ESCENARIOS                      -->
+    <!-- ===================================================================== -->
+    <aside id="sidebar" class="fixed lg:sticky top-0 left-0 z-40 h-screen w-80 xl:w-[340px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none">
+      
+      <!-- Sidebar Header -->
+      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shadow-blue-600/30">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight">Simulador SVD/POD</h1>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Dinámica Estructural Sísmica</p>
+          </div>
+        </div>
+        <button id="closeSidebarBtn" class="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cerrar panel">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Scrollable Controls -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+        <!-- Escenarios Predefinidos -->
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            Escenarios Preestablecidos
+          </label>
+          <div class="grid grid-cols-1 gap-2">
+            <button data-preset="base" class="preset-btn text-left px-3 py-2 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/70 dark:bg-blue-950/40 hover:bg-blue-100/70 dark:hover:bg-blue-900/40 transition flex items-center justify-between group">
+              <div>
+                <div class="text-xs font-semibold text-blue-700 dark:text-blue-300">Base (Zhao et al., 2022)</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">20p · 50t · 7.5MN/m · ζ=0.47% · A=0.18</div>
+              </div>
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+            </button>
+
+            <button data-preset="severo" class="preset-btn text-left px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-red-300 dark:hover:border-red-700 bg-white dark:bg-slate-800/50 hover:bg-red-50/50 dark:hover:bg-red-950/30 transition flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Sismo Severo (Alerta)</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Intensidad A=0.45 · Respuesta extrema</div>
+              </div>
+              <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            </button>
+
+            <button data-preset="flexible" class="preset-btn text-left px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-amber-300 dark:hover:border-amber-700 bg-white dark:bg-slate-800/50 hover:bg-amber-50/50 dark:hover:bg-amber-950/30 transition flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Estructura Flexible</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Rigidez 4.0 MN/m · A=0.25</div>
+              </div>
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            </button>
+
+            <button data-preset="amortiguado" class="preset-btn text-left px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-emerald-300 dark:hover:border-emerald-700 bg-white dark:bg-slate-800/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Alto Amortiguamiento</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Disipadores ζ=5.0% · Controlado</div>
+              </div>
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-slate-200 dark:border-slate-800" />
+
+        <!-- Parámetros Estructurales -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Parámetros del Edificio</span>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+              <input id="autoRunToggle" type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              Auto-simular
+            </label>
+          </div>
+
+          <!-- Número de pisos -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="nFloorsNum" class="font-medium text-slate-700 dark:text-slate-300">Número de pisos (N)</label>
+              <div class="flex items-center gap-1">
+                <input id="nFloorsNum" type="number" min="5" max="30" step="1" value="20" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">pisos</span>
+              </div>
+            </div>
+            <input id="nFloorsRange" type="range" min="5" max="30" step="1" value="20" class="w-full" />
+          </div>
+
+          <!-- Masa por piso -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="massNum" class="font-medium text-slate-700 dark:text-slate-300">Masa por piso (m)</label>
+              <div class="flex items-center gap-1">
+                <input id="massNum" type="number" min="20" max="120" step="1" value="50" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">ton</span>
+              </div>
+            </div>
+            <input id="massRange" type="range" min="20" max="120" step="1" value="50" class="w-full" />
+          </div>
+
+          <!-- Rigidez entrepiso -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="stiffnessNum" class="font-medium text-slate-700 dark:text-slate-300">Rigidez entrepiso (k)</label>
+              <div class="flex items-center gap-1">
+                <input id="stiffnessNum" type="number" min="2.0" max="15.0" step="0.1" value="7.5" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-9">MN/m</span>
+              </div>
+            </div>
+            <input id="stiffnessRange" type="range" min="2.0" max="15.0" step="0.1" value="7.5" class="w-full" />
+          </div>
+
+          <!-- Amortiguamiento crítico -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="dampingNum" class="font-medium text-slate-700 dark:text-slate-300">Amortiguamiento (ζ)</label>
+              <div class="flex items-center gap-1">
+                <input id="dampingNum" type="number" min="0.1" max="10.0" step="0.01" value="0.47" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">%</span>
+              </div>
+            </div>
+            <input id="dampingRange" type="range" min="0.1" max="10.0" step="0.01" value="0.47" class="w-full" />
+          </div>
+        </div>
+
+        <hr class="border-slate-200 dark:border-slate-800" />
+
+        <!-- Parámetros del Sismo y SVD -->
+        <div class="space-y-4">
+          <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Excitación Sísmica &amp; SVD</span>
+
+          <!-- Intensidad sísmica -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="intensityNum" class="font-medium text-slate-700 dark:text-slate-300">Intensidad sísmica (A)</label>
+              <div class="flex items-center gap-1">
+                <input id="intensityNum" type="number" min="0.05" max="0.60" step="0.01" value="0.18" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">m/s²</span>
+              </div>
+            </div>
+            <input id="intensityRange" type="range" min="0.05" max="0.60" step="0.01" value="0.18" class="w-full" />
+          </div>
+
+          <!-- Duración del sismo -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="tfNum" class="font-medium text-slate-700 dark:text-slate-300">Duración del sismo (tf)</label>
+              <div class="flex items-center gap-1">
+                <input id="tfNum" type="number" min="10" max="30" step="1" value="20" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">seg</span>
+              </div>
+            </div>
+            <input id="tfRange" type="range" min="10" max="30" step="1" value="20" class="w-full" />
+          </div>
+
+          <!-- Umbral de energía SVD -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="energyNum" class="font-medium text-slate-700 dark:text-slate-300">Umbral energía SVD</label>
+              <div class="flex items-center gap-1">
+                <input id="energyNum" type="number" min="90.0" max="99.99" step="0.01" value="99.00" class="w-16 px-1.5 py-0.5 text-right font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <span class="text-[11px] text-slate-400 w-7">%</span>
+              </div>
+            </div>
+            <input id="energyRange" type="range" min="90.0" max="99.99" step="0.01" value="99.00" class="w-full" />
+          </div>
+
+          <!-- Selector de Piso intermedio -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <label for="midFloorSelect" class="font-medium text-slate-700 dark:text-slate-300">Piso intermedio (Gráf. 3)</label>
+              <select id="midFloorSelect" class="px-2 py-1 font-mono text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer Actions -->
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 space-y-2">
+        <button id="runSimBtn" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-semibold text-sm shadow-sm shadow-blue-600/25 transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+          </svg>
+          Ejecutar Simulación
+        </button>
+
+        <button id="exportCsvBtn" class="w-full py-2 px-4 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium text-xs transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          Exportar CSV (datos_edificio_sismo.csv)
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- ÁREA PRINCIPAL DERECHA                                                -->
+    <!-- ===================================================================== -->
+    <main class="flex-1 min-w-0 flex flex-col">
+
+      <!-- Top Header Bar -->
+      <header class="sticky top-0 z-20 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <button id="openSidebarBtn" class="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Abrir controles">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+          <div class="truncate">
+            <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
+              Monitoreo Sísmico y Reducción de Orden de Modelos (SVD/POD)
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+              Modelo Estructural Multipiso (Zhao et al., 2022) · Integración RK4 &amp; Proyección Galerkin
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <span id="simStatusBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Simulación lista
+          </span>
+
+          <!-- Theme Toggle -->
+          <button id="themeToggleBtn" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+            <svg id="sunIcon" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+            </svg>
+            <svg id="moonIcon" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Dashboard Content -->
+      <div class="p-4 sm:p-6 space-y-6 max-w-[1600px] w-full mx-auto">
+
+        <!-- ================================================================= -->
+        <!-- FILA 1: 5 TARJETAS KPI                                            -->
+        <!-- ================================================================= -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+
+          <!-- KPI 1: Reducción de Modos -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Reducción de Modos</span>
+              <span class="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+              </span>
+            </div>
+            <div id="kpiModes" class="text-xl font-bold font-mono text-slate-900 dark:text-white">-- → --</div>
+            <div id="kpiEnergy" class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">Energía: --%</div>
+          </div>
+
+          <!-- KPI 2: Precisión del Modelo -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Precisión del ROM</span>
+              <span class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+            </div>
+            <div id="kpiAccuracy" class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">--%</div>
+            <div id="kpiRelErr" class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">Error rel: --%</div>
+          </div>
+
+          <!-- KPI 3: Speed-up -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Aceleración (Speed-up)</span>
+              <span class="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                </svg>
+              </span>
+            </div>
+            <div id="kpiSpeedup" class="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">--x</div>
+            <div id="kpiTimes" class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">FOM --ms vs ROM --ms</div>
+          </div>
+
+          <!-- KPI 4: Desplazamiento Máximo Azotea -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Desplaz. Máx. Azotea</span>
+              <span class="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                </svg>
+              </span>
+            </div>
+            <div id="kpiMaxDisp" class="text-xl font-bold font-mono text-slate-900 dark:text-white">-- mm</div>
+            <div id="kpiMaxDispSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">Límite elástico: 150 mm</div>
+          </div>
+
+          <!-- KPI 5: Diagnóstico Estructural -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs sm:col-span-2 lg:col-span-1">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Diagnóstico Estructural</span>
+              <span class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
+              </span>
+            </div>
+            <div id="kpiStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide mt-0.5">
+              --
+            </div>
+            <div id="kpiStatusDesc" class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-snug">--</div>
+          </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- FILA 2: ANIMACIÓN 2D INTERACTIVA DEL EDIFICIO + SEÑAL SÍSMICA     -->
+        <!-- ================================================================= -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                Simulación Visual 2D en Tiempo Real (Completo vs. ROM)
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Superposición del desplazamiento estructural por piso (Azul sólido: FOM · Rojo punteado: ROM)
+              </p>
+            </div>
+
+            <!-- Controles de reproducción -->
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="playPauseBtn" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                <svg id="playIcon" class="w-3.5 h-3.5 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="pauseIcon" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <span id="playPauseText">Pausar</span>
+              </button>
+
+              <button id="resetAnimBtn" class="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition">
+                Reiniciar
+              </button>
+
+              <select id="animSpeedSelect" class="px-2 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200 focus:outline-none">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1.0x</option>
+                <option value="2">2.0x</option>
+              </select>
+
+              <select id="animScaleSelect" class="px-2 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200 focus:outline-none" title="Factor de amplificación visual">
+                <option value="auto" selected>Escala: Auto</option>
+                <option value="200">Escala: 200x</option>
+                <option value="400">Escala: 400x</option>
+                <option value="800">Escala: 800x</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
+            <!-- Canvas del Edificio -->
+            <div class="lg:col-span-7 p-4 flex flex-col">
+              <div class="relative w-full h-[300px] sm:h-[340px] rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                <canvas id="buildingCanvas" class="w-full h-full block"></canvas>
+                <!-- Live Overlay Readout -->
+                <div class="absolute top-3 left-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] font-mono space-y-0.5 pointer-events-none">
+                  <div class="text-slate-500 dark:text-slate-400">t = <span id="liveTime" class="text-slate-900 dark:text-white font-semibold">0.00</span> s</div>
+                  <div class="text-blue-600 dark:text-blue-400">Azotea FOM: <span id="liveRoofFom" class="font-semibold">0.0</span> mm</div>
+                  <div class="text-red-500">Azotea ROM: <span id="liveRoofRom" class="font-semibold">0.0</span> mm</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel Derecho: Mini-gráfica de Aceleración Sísmica + Scrubber -->
+            <div class="lg:col-span-5 p-4 flex flex-col justify-between gap-4">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Aceleración del Suelo $a_g(t)$</span>
+                  <span id="liveAgVal" class="text-xs font-mono text-amber-600 dark:text-amber-400 font-semibold">0.000 m/s²</span>
+                </div>
+                <div class="w-full h-[180px] rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                  <canvas id="accelCanvas" class="w-full h-full block"></canvas>
+                </div>
+              </div>
+
+              <!-- Scrubber de Tiempo -->
+              <div class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-medium text-slate-600 dark:text-slate-300">Línea de tiempo del sismo</span>
+                  <span class="font-mono text-slate-900 dark:text-white font-semibold">
+                    <span id="scrubberTime">0.00</span> / <span id="scrubberMax">20.00</span> s
+                  </span>
+                </div>
+                <input id="timeScrubber" type="range" min="0" max="499" step="1" value="0" class="w-full" />
+                <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                  <span>0.0 s</span>
+                  <span>Snapshot <span id="scrubberIdx">1</span> / 500</span>
+                  <span id="scrubberEndLabel">20.0 s</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- FILA 3: 4 GRÁFICAS CIENTÍFICAS INTERACTIVAS (PLOTLY.JS)           -->
+        <!-- ================================================================= -->
+        <section class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+          <!-- Gráfica 1: Espectro SVD y Energía Acumulada -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">1. Espectro Singular y Energía Acumulada</h3>
+              <span class="text-[11px] font-mono text-slate-400">SVD / POD</span>
+            </div>
+            <div id="plotSvd" class="w-full h-[330px]"></div>
+          </div>
+
+          <!-- Gráfica 2: Respuesta Temporal en Azotea -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 id="titlePlotRoof" class="text-sm font-bold text-slate-900 dark:text-white">2. Respuesta Temporal en la Azotea (Piso 20)</h3>
+              <span class="text-[11px] font-mono text-slate-400">FOM vs ROM</span>
+            </div>
+            <div id="plotRoof" class="w-full h-[330px]"></div>
+          </div>
+
+          <!-- Gráfica 3: Respuesta Temporal en Piso Intermedio -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 id="titlePlotMid" class="text-sm font-bold text-slate-900 dark:text-white">3. Respuesta Temporal a Media Altura (Piso 10)</h3>
+              <span class="text-[11px] font-mono text-slate-400">FOM vs ROM</span>
+            </div>
+            <div id="plotMid" class="w-full h-[330px]"></div>
+          </div>
+
+          <!-- Gráfica 4: Mapa de Calor Espaciotemporal del Error -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">4. Distribución Espaciotemporal del Error Residual</h3>
+              <span class="text-[11px] font-mono text-slate-400">|U_full - U_rom| (mm)</span>
+            </div>
+            <div id="plotError" class="w-full h-[330px]"></div>
+          </div>
+
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- FILA 4: REPORTES CON PESTAÑAS (EJECUTIVO Y TÉCNICO)               -->
+        <!-- ================================================================= -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          <!-- Tabs Header -->
+          <div class="border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center gap-6 overflow-x-auto">
+            <button id="tabExecBtn" class="tab-btn py-3.5 text-sm font-semibold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 whitespace-nowrap transition">
+              Reporte Ejecutivo (Intuitivo)
+            </button>
+            <button id="tabTechBtn" class="tab-btn py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap transition">
+              Reporte Técnico y Matemático
+            </button>
+          </div>
+
+          <!-- Tab 1: Reporte Ejecutivo (Bloque B) -->
+          <div id="tabExecPanel" class="p-5 sm:p-6">
+            <div class="mb-5">
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Monitoreo Inteligente y Simulación Sísmica en Tiempo Real
+              </h3>
+              <p id="execSubtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Edificio Residencial de 20 Pisos
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Card 1 -->
+              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70">
+                <div class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2">1. ¿Qué hizo el programa?</div>
+                <ul id="execBlock1" class="text-sm text-slate-700 dark:text-slate-300 space-y-1.5 list-disc list-inside"></ul>
+              </div>
+
+              <!-- Card 2 -->
+              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70">
+                <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2">2. ¿Qué tan rápido fue el cálculo?</div>
+                <ul id="execBlock2" class="text-sm text-slate-700 dark:text-slate-300 space-y-1.5 list-disc list-inside"></ul>
+              </div>
+
+              <!-- Card 3 -->
+              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70">
+                <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">3. ¿Qué tan precisa fue la aproximación?</div>
+                <ul id="execBlock3" class="text-sm text-slate-700 dark:text-slate-300 space-y-1.5 list-disc list-inside"></ul>
+              </div>
+
+              <!-- Card 4 -->
+              <div id="execCard4" class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-2">4. Estado de seguridad del edificio durante el sismo</div>
+                <div id="execBlock4" class="text-sm text-slate-700 dark:text-slate-300 space-y-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Reporte Técnico (Bloque A) -->
+          <div id="tabTechPanel" class="p-5 sm:p-6 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Tabla de Métricas SVD/POD -->
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+                  Resultados Técnicos de Reducción SVD/POD
+                </h4>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table class="w-full text-sm text-left">
+                    <tbody id="techMetricsTable" class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-xs"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Tabla de Parámetros Dinámicos y Modales -->
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+                  Parámetros Estructurales, Rayleigh y Valores Singulares
+                </h4>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table class="w-full text-sm text-left">
+                    <tbody id="techParamsTable" class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-xs"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MOTOR MATEMÁTICO EN JAVASCRIPT Y LÓGICA DEL DASHBOARD                 -->
+  <!-- ===================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // =====================================================================
+      // 1. UTILIDADES DE ÁLGEBRA LINEAL (JACOBI SIMÉTRICO Y GAUSS)
+      // =====================================================================
+
+      /**
+       * Descomposición espectral de Jacobi para matrices simétricas reales A (n x n).
+       * Retorna { eigenvalues: Float64Array, eigenvectors: Float64Array[] (por columnas) }
+       * ordenados de mayor a menor o menor a mayor según el parámetro `descending`.
+       */
+      function jacobiEigenSymmetric(A_in, n, descending = false) {
+        const A = new Float64Array(n * n);
+        for (let i = 0; i < n * n; i++) A[i] = A_in[i];
+
+        const V = new Float64Array(n * n);
+        for (let i = 0; i < n; i++) V[i * n + i] = 1.0;
+
+        const maxIter = 100 * n * n;
+        const tol = 1e-12;
+
+        for (let iter = 0; iter < maxIter; iter++) {
+          let p = 0, q = 1;
+          let maxVal = 0.0;
+          for (let i = 0; i < n; i++) {
+            const row = i * n;
+            for (let j = i + 1; j < n; j++) {
+              const val = Math.abs(A[row + j]);
+              if (val > maxVal) {
+                maxVal = val;
+                p = i;
+                q = j;
+              }
+            }
+          }
+
+          if (maxVal < tol) break;
+
+          const app = A[p * n + p];
+          const aqq = A[q * n + q];
+          const apq = A[p * n + q];
+
+          const tau = (aqq - app) / (2.0 * apq);
+          const t = tau >= 0
+            ? 1.0 / (tau + Math.sqrt(1.0 + tau * tau))
+            : -1.0 / (-tau + Math.sqrt(1.0 + tau * tau));
+          const c = 1.0 / Math.sqrt(1.0 + t * t);
+          const s = t * c;
+
+          A[p * n + p] = app - t * apq;
+          A[q * n + q] = aqq + t * apq;
+          A[p * n + q] = 0.0;
+          A[q * n + p] = 0.0;
+
+          for (let r = 0; r < n; r++) {
+            if (r !== p && r !== q) {
+              const arp = A[r * n + p];
+              const arq = A[r * n + q];
+              const newRp = c * arp - s * arq;
+              const newRq = s * arp + c * arq;
+              A[r * n + p] = newRp;
+              A[p * n + r] = newRp;
+              A[r * n + q] = newRq;
+              A[q * n + r] = newRq;
+            }
+          }
+
+          for (let r = 0; r < n; r++) {
+            const vrp = V[r * n + p];
+            const vrq = V[r * n + q];
+            V[r * n + p] = c * vrp - s * vrq;
+            V[r * n + q] = s * vrp + c * vrq;
+          }
+        }
+
+        const pairs = [];
+        for (let i = 0; i < n; i++) {
+          pairs.push({ val: A[i * n + i], idx: i });
+        }
+        pairs.sort((a, b) => (descending ? b.val - a.val : a.val - b.val));
+
+        const eigenvalues = new Float64Array(n);
+        const eigenvectors = new Float64Array(n * n); // Column-major access via V[row * n + col]
+        for (let col = 0; col < n; col++) {
+          eigenvalues[col] = pairs[col].val;
+          const origCol = pairs[col].idx;
+          for (let row = 0; row < n; row++) {
+            eigenvectors[row * n + col] = V[row * n + origCol];
+          }
+        }
+
+        return { eigenvalues, eigenvectors };
+      }
+
+      /**
+       * Eliminación Gaussiana con pivoteo parcial para resolver A * x = b (k x k).
+       */
+      function solveLinearSystem(A_in, b_in, k) {
+        const A = new Float64Array(k * k);
+        const b = new Float64Array(k);
+        for (let i = 0; i < k * k; i++) A[i] = A_in[i];
+        for (let i = 0; i < k; i++) b[i] = b_in[i];
+
+        for (let col = 0; col < k; col++) {
+          // Pivoteo parcial
+          let maxRow = col;
+          let maxVal = Math.abs(A[col * k + col]);
+          for (let row = col + 1; row < k; row++) {
+            const val = Math.abs(A[row * k + col]);
+            if (val > maxVal) {
+              maxVal = val;
+              maxRow = row;
+            }
+          }
+
+          if (maxRow !== col) {
+            for (let j = col; j < k; j++) {
+              const tmp = A[col * k + j];
+              A[col * k + j] = A[maxRow * k + j];
+              A[maxRow * k + j] = tmp;
+            }
+            const tmpB = b[col];
+            b[col] = b[maxRow];
+            b[maxRow] = tmpB;
+          }
+
+          const pivot = A[col * k + col];
+          if (Math.abs(pivot) < 1e-18) continue;
+
+          for (let row = col + 1; row < k; row++) {
+            const factor = A[row * k + col] / pivot;
+            for (let j = col + 1; j < k; j++) {
+              A[row * k + j] -= factor * A[col * k + j];
+            }
+            b[row] -= factor * b[col];
+          }
+        }
+
+        const x = new Float64Array(k);
+        for (let i = k - 1; i >= 0; i--) {
+          let sum = b[i];
+          for (let j = i + 1; j < k; j++) {
+            sum -= A[i * k + j] * x[j];
+          }
+          x[i] = sum / A[i * k + i];
+        }
+        return x;
+      }
+
+      // =====================================================================
+      // 2. MODELO FÍSICO: MATRICES ESTRUCTURALES Y ACELERACIÓN DEL SUELO
+      // =====================================================================
+
+      function buildStructuralMatrices(p) {
+        const n = p.n_floors;
+        const m = p.mass_per_floor;
+        const k = p.stiffness;
+
+        const M = new Float64Array(n * n);
+        const K = new Float64Array(n * n);
+        const MinvK = new Float64Array(n * n);
+
+        for (let i = 0; i < n; i++) {
+          M[i * n + i] = m;
+          if (i === 0) {
+            K[i * n + i] = 2.0 * k;
+            K[i * n + (i + 1)] = -k;
+          } else if (i === n - 1) {
+            K[i * n + i] = k;
+            K[i * n + (i - 1)] = -k;
+          } else {
+            K[i * n + i] = 2.0 * k;
+            K[i * n + (i - 1)] = -k;
+            K[i * n + (i + 1)] = -k;
+          }
+        }
+
+        // M^-1 K = (1/m) * K (simétrica porque M = m*I)
+        const invM = 1.0 / m;
+        for (let i = 0; i < n * n; i++) {
+          MinvK[i] = K[i] * invM;
+        }
+
+        const eig = jacobiEigenSymmetric(MinvK, n, false);
+        const omegas = new Float64Array(n);
+        for (let i = 0; i < n; i++) {
+          omegas[i] = Math.sqrt(Math.max(eig.eigenvalues[i], 1e-6));
+        }
+
+        const w1 = omegas[0];
+        const w2 = omegas[1];
+        const wMax = omegas[n - 1];
+
+        const a0 = 2.0 * p.damping_ratio * (w1 * w2) / (w1 + w2);
+        const a1 = 2.0 * p.damping_ratio / (w1 + w2);
+
+        const C = new Float64Array(n * n);
+        for (let i = 0; i < n * n; i++) {
+          C[i] = a0 * M[i] + a1 * K[i];
+        }
+
+        return { M, C, K, w1, w2, wMax, a0, a1 };
+      }
+
+      function groundAcceleration(t, A) {
+        if (t <= 0) return 0.0;
+        const envelope = Math.exp(-0.25 * t) * Math.pow(t, 1.8);
+        const oscillation =
+          Math.sin(2.5 * Math.PI * t) +
+          0.6 * Math.sin(5.0 * Math.PI * t) +
+          0.3 * Math.sin(8.0 * Math.PI * t);
+        return A * envelope * oscillation;
+      }
+
+      // =====================================================================
+      // 3. SIMULACIÓN COMPLETA (FOM) CON RK4 ESTABLE
+      // =====================================================================
+
+      function simulateFull(p, matrices) {
+        const n = p.n_floors;
+        const nTimes = p.n_times;
+        const { C, K, wMax, a0, a1 } = matrices;
+        const invM = 1.0 / p.mass_per_floor;
+        const A_intensity = p.intensity;
+
+        // Cálculo de paso seguro para garantizar estabilidad total de RK4
+        const lambdaMax = Math.max(wMax, a0 + a1 * wMax * wMax);
+        const dtSafe = Math.min(0.005, 1.5 / Math.max(lambdaMax, 1.0));
+        const dtSnap = (p.tf - p.t0) / (nTimes - 1);
+        const subSteps = Math.max(1, Math.ceil(dtSnap / dtSafe));
+        const h = dtSnap / subSteps;
+
+        const tArr = new Float64Array(nTimes);
+        const agArr = new Float64Array(nTimes);
+        const U_full = new Float64Array(n * nTimes); // row i, col j -> U_full[i * nTimes + j]
+
+        const y = new Float64Array(2 * n);
+        const k1 = new Float64Array(2 * n);
+        const k2 = new Float64Array(2 * n);
+        const k3 = new Float64Array(2 * n);
+        const k4 = new Float64Array(2 * n);
+        const yTmp = new Float64Array(2 * n);
+
+        function rhs(t, state, out) {
+          const ag = groundAcceleration(t, A_intensity);
+          for (let i = 0; i < n; i++) {
+            out[i] = state[n + i]; // du/dt = v
+            let cv = 0.0;
+            let ku = 0.0;
+            const row = i * n;
+            for (let j = 0; j < n; j++) {
+              cv += C[row + j] * state[n + j];
+              ku += K[row + j] * state[j];
+            }
+            // M*a = -C*v - K*u - M*1*ag  =>  a = (-C*v - K*u)/m - ag
+            out[n + i] = (-cv - ku) * invM - ag;
+          }
+        }
+
+        const tStart = performance.now();
+
+        let t = p.t0;
+        tArr[0] = t;
+        agArr[0] = groundAcceleration(t, A_intensity);
+        for (let i = 0; i < n; i++) U_full[i * nTimes + 0] = y[i];
+
+        for (let sIdx = 1; sIdx < nTimes; sIdx++) {
+          for (let step = 0; step < subSteps; step++) {
+            rhs(t, y, k1);
+
+            for (let i = 0; i < 2 * n; i++) yTmp[i] = y[i] + 0.5 * h * k1[i];
+            rhs(t + 0.5 * h, yTmp, k2);
+
+            for (let i = 0; i < 2 * n; i++) yTmp[i] = y[i] + 0.5 * h * k2[i];
+            rhs(t + 0.5 * h, yTmp, k3);
+
+            for (let i = 0; i < 2 * n; i++) yTmp[i] = y[i] + h * k3[i];
+            rhs(t + h, yTmp, k4);
+
+            const h6 = h / 6.0;
+            for (let i = 0; i < 2 * n; i++) {
+              y[i] += h6 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+            }
+            t += h;
+          }
+
+          tArr[sIdx] = t;
+          agArr[sIdx] = groundAcceleration(t, A_intensity);
+          for (let i = 0; i < n; i++) {
+            U_full[i * nTimes + sIdx] = y[i];
+          }
+        }
+
+        const runtimeMs = performance.now() - tStart;
+        return { t: tArr, ag: agArr, U_full, runtimeMs, subSteps, h };
+      }
+
+      // =====================================================================
+      // 4. DESCOMPOSICIÓN SVD / POD MEDIANTE MATRIZ DE COVARIANZA
+      // =====================================================================
+
+      function computeSvdPod(U_full, n, nTimes, threshold) {
+        // Matriz de covarianza de snapshots: S = U_full * U_full^T (n x n simétrica)
+        const S = new Float64Array(n * n);
+        for (let i = 0; i < n; i++) {
+          const rowI = i * nTimes;
+          for (let j = i; j < n; j++) {
+            const rowJ = j * nTimes;
+            let sum = 0.0;
+            for (let t = 0; t < nTimes; t++) {
+              sum += U_full[rowI + t] * U_full[rowJ + t];
+            }
+            S[i * n + j] = sum;
+            S[j * n + i] = sum;
+          }
+        }
+
+        const eig = jacobiEigenSymmetric(S, n, true);
+        const singularValues = new Float64Array(n);
+        let totalEnergy = 0.0;
+
+        for (let i = 0; i < n; i++) {
+          const lam = Math.max(eig.eigenvalues[i], 0.0);
+          singularValues[i] = Math.sqrt(lam);
+          totalEnergy += lam;
+        }
+
+        const energy = new Float64Array(n);
+        let cum = 0.0;
+        let k = n;
+        let found = false;
+        for (let i = 0; i < n; i++) {
+          cum += singularValues[i] * singularValues[i];
+          energy[i] = totalEnergy > 0 ? cum / totalEnergy : 1.0;
+          if (!found && energy[i] >= threshold) {
+            k = i + 1;
+            found = true;
+          }
+        }
+
+        // Extraer los primeros k vectores singulares izquierdos U_k (n x k)
+        const U_k = new Float64Array(n * k);
+        for (let row = 0; row < n; row++) {
+          for (let col = 0; col < k; col++) {
+            U_k[row * k + col] = eig.eigenvectors[row * n + col];
+          }
+        }
+
+        return { U_k, singularValues, energy, k };
+      }
+
+      // =====================================================================
+      // 5. PROYECCIÓN Y SIMULACIÓN DEL MODELO DE ORDEN REDUCIDO (ROM)
+      // =====================================================================
+
+      function projectMatrix(U_k, A, n, k) {
+        // Calcula U_k^T * A * U_k (k x k)
+        const tmp = new Float64Array(n * k); // A * U_k
+        for (let i = 0; i < n; i++) {
+          const rowA = i * n;
+          for (let col = 0; col < k; col++) {
+            let sum = 0.0;
+            for (let j = 0; j < n; j++) {
+              sum += A[rowA + j] * U_k[j * k + col];
+            }
+            tmp[i * k + col] = sum;
+          }
+        }
+
+        const res = new Float64Array(k * k);
+        for (let r = 0; r < k; r++) {
+          for (let c = 0; c < k; c++) {
+            let sum = 0.0;
+            for (let i = 0; i < n; i++) {
+              sum += U_k[i * k + r] * tmp[i * k + c];
+            }
+            res[r * k + c] = sum;
+          }
+        }
+        return res;
+      }
+
+      function simulateRom(p, matrices, U_k, k, subSteps, h) {
+        const n = p.n_floors;
+        const nTimes = p.n_times;
+        const { M, C, K } = matrices;
+        const A_intensity = p.intensity;
+
+        const M_r = projectMatrix(U_k, M, n, k);
+        const C_r = projectMatrix(U_k, C, n, k);
+        const K_r = projectMatrix(U_k, K, n, k);
+
+        // r_r = U_k^T * (M * ones(n))
+        const r_r = new Float64Array(k);
+        for (let r = 0; r < k; r++) {
+          let sum = 0.0;
+          for (let i = 0; i < n; i++) {
+            sum += U_k[i * k + r] * p.mass_per_floor;
+          }
+          r_r[r] = sum;
+        }
+
+        const a_state = new Float64Array(2 * k);
+        const k1 = new Float64Array(2 * k);
+        const k2 = new Float64Array(2 * k);
+        const k3 = new Float64Array(2 * k);
+        const k4 = new Float64Array(2 * k);
+        const aTmp = new Float64Array(2 * k);
+        const F_mod = new Float64Array(k);
+
+        const a_coords = new Float64Array(k * nTimes);
+
+        function rhsRom(t, state, out) {
+          const ag = groundAcceleration(t, A_intensity);
+          for (let i = 0; i < k; i++) {
+            out[i] = state[k + i];
+            let cv = 0.0;
+            let ku = 0.0;
+            const row = i * k;
+            for (let j = 0; j < k; j++) {
+              cv += C_r[row + j] * state[k + j];
+              ku += K_r[row + j] * state[j];
+            }
+            F_mod[i] = -cv - ku - r_r[i] * ag;
+          }
+          const a_ddot = solveLinearSystem(M_r, F_mod, k);
+          for (let i = 0; i < k; i++) {
+            out[k + i] = a_ddot[i];
+          }
+        }
+
+        const tStart = performance.now();
+
+        let t = p.t0;
+        for (let i = 0; i < k; i++) a_coords[i * nTimes + 0] = 0.0;
+
+        for (let sIdx = 1; sIdx < nTimes; sIdx++) {
+          for (let step = 0; step < subSteps; step++) {
+            rhsRom(t, a_state, k1);
+
+            for (let i = 0; i < 2 * k; i++) aTmp[i] = a_state[i] + 0.5 * h * k1[i];
+            rhsRom(t + 0.5 * h, aTmp, k2);
+
+            for (let i = 0; i < 2 * k; i++) aTmp[i] = a_state[i] + 0.5 * h * k2[i];
+            rhsRom(t + 0.5 * h, aTmp, k3);
+
+            for (let i = 0; i < 2 * k; i++) aTmp[i] = a_state[i] + h * k3[i];
+            rhsRom(t + h, aTmp, k4);
+
+            const h6 = h / 6.0;
+            for (let i = 0; i < 2 * k; i++) {
+              a_state[i] += h6 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+            }
+            t += h;
+          }
+
+          for (let i = 0; i < k; i++) {
+            a_coords[i * nTimes + sIdx] = a_state[i];
+          }
+        }
+
+        // Reconstrucción física: U_rom = U_k * a_coords
+        const U_rom = new Float64Array(n * nTimes);
+        for (let i = 0; i < n; i++) {
+          const rowU = i * k;
+          const rowOut = i * nTimes;
+          for (let sIdx = 0; sIdx < nTimes; sIdx++) {
+            let sum = 0.0;
+            for (let r = 0; r < k; r++) {
+              sum += U_k[rowU + r] * a_coords[r * nTimes + sIdx];
+            }
+            U_rom[rowOut + sIdx] = sum;
+          }
+        }
+
+        const runtimeMs = performance.now() - tStart;
+        return { U_rom, runtimeMs };
+      }
+
+      // =====================================================================
+      // 6. MÉTRICAS DE VALIDACIÓN
+      // =====================================================================
+
+      function computeMetrics(U_full, U_rom, n, nTimes) {
+        let sumSqDiff = 0.0;
+        let sumSqTrue = 0.0;
+        const totalElements = n * nTimes;
+
+        for (let i = 0; i < totalElements; i++) {
+          const diff = U_full[i] - U_rom[i];
+          sumSqDiff += diff * diff;
+          sumSqTrue += U_full[i] * U_full[i];
+        }
+
+        const rms = Math.sqrt(sumSqDiff / totalElements);
+        const relError = sumSqTrue > 0 ? (Math.sqrt(sumSqDiff) / Math.sqrt(sumSqTrue)) * 100.0 : 0.0;
+
+        // Máximo desplazamiento en la azotea (último piso = n - 1)
+        let maxRoofM = 0.0;
+        const roofOffset = (n - 1) * nTimes;
+        for (let j = 0; j < nTimes; j++) {
+          const v = Math.abs(U_full[roofOffset + j]);
+          if (v > maxRoofM) maxRoofM = v;
+        }
+
+        return {
+          rmsM: rms,
+          rmsMm: rms * 1000.0,
+          relErrorPct: relError,
+          accuracyPct: Math.max(0, 100.0 - relError),
+          maxRoofMm: maxRoofM * 1000.0,
+        };
+      }
+
+      // =====================================================================
+      // 7. ESTADO GLOBAL DEL DASHBOARD Y REFERENCIAS DOM
+      // =====================================================================
+
+      const state = {
+        params: {
+          n_floors: 20,
+          mass_per_floor: 50000,
+          stiffness: 7.5e6,
+          damping_ratio: 0.0047,
+          intensity: 0.18,
+          t0: 0.0,
+          tf: 20.0,
+          n_times: 500,
+          energy_threshold: 0.99,
+          mid_floor: 10,
+        },
+        result: null,
+        anim: {
+          playing: true,
+          frameFloat: 0,
+          speed: 1.0,
+          scaleMode: 'auto',
+          lastTimestamp: null,
+        },
+        isDark: false,
+      };
+
+      const PRESETS = {
+        base: {
+          name: 'Base (Zhao et al., 2022)',
+          n_floors: 20, mass_t: 50, stiffness_mn: 7.5, damping_pct: 0.47, intensity: 0.18, tf: 20, energy_pct: 99.00
+        },
+        severo: {
+          name: 'Sismo Severo (Alerta)',
+          n_floors: 20, mass_t: 50, stiffness_mn: 7.5, damping_pct: 0.47, intensity: 0.45, tf: 20, energy_pct: 99.00
+        },
+        flexible: {
+          name: 'Estructura Flexible',
+          n_floors: 20, mass_t: 50, stiffness_mn: 4.0, damping_pct: 0.47, intensity: 0.25, tf: 20, energy_pct: 99.00
+        },
+        amortiguado: {
+          name: 'Alto Amortiguamiento',
+          n_floors: 20, mass_t: 50, stiffness_mn: 7.5, damping_pct: 5.00, intensity: 0.18, tf: 20, energy_pct: 99.00
+        },
+      };
+
+      // DOM elements
+      const els = {
+        sidebar: document.getElementById('sidebar'),
+        sidebarBackdrop: document.getElementById('sidebarBackdrop'),
+        openSidebarBtn: document.getElementById('openSidebarBtn'),
+        closeSidebarBtn: document.getElementById('closeSidebarBtn'),
+        themeToggleBtn: document.getElementById('themeToggleBtn'),
+        autoRunToggle: document.getElementById('autoRunToggle'),
+        runSimBtn: document.getElementById('runSimBtn'),
+        exportCsvBtn: document.getElementById('exportCsvBtn'),
+        midFloorSelect: document.getElementById('midFloorSelect'),
+
+        // Inputs
+        nFloorsNum: document.getElementById('nFloorsNum'),
+        nFloorsRange: document.getElementById('nFloorsRange'),
+        massNum: document.getElementById('massNum'),
+        massRange: document.getElementById('massRange'),
+        stiffnessNum: document.getElementById('stiffnessNum'),
+        stiffnessRange: document.getElementById('stiffnessRange'),
+        dampingNum: document.getElementById('dampingNum'),
+        dampingRange: document.getElementById('dampingRange'),
+        intensityNum: document.getElementById('intensityNum'),
+        intensityRange: document.getElementById('intensityRange'),
+        tfNum: document.getElementById('tfNum'),
+        tfRange: document.getElementById('tfRange'),
+        energyNum: document.getElementById('energyNum'),
+        energyRange: document.getElementById('energyRange'),
+
+        // KPIs
+        kpiModes: document.getElementById('kpiModes'),
+        kpiEnergy: document.getElementById('kpiEnergy'),
+        kpiAccuracy: document.getElementById('kpiAccuracy'),
+        kpiRelErr: document.getElementById('kpiRelErr'),
+        kpiSpeedup: document.getElementById('kpiSpeedup'),
+        kpiTimes: document.getElementById('kpiTimes'),
+        kpiMaxDisp: document.getElementById('kpiMaxDisp'),
+        kpiStatusBadge: document.getElementById('kpiStatusBadge'),
+        kpiStatusDesc: document.getElementById('kpiStatusDesc'),
+
+        // Animation
+        buildingCanvas: document.getElementById('buildingCanvas'),
+        accelCanvas: document.getElementById('accelCanvas'),
+        playPauseBtn: document.getElementById('playPauseBtn'),
+        playIcon: document.getElementById('playIcon'),
+        pauseIcon: document.getElementById('pauseIcon'),
+        playPauseText: document.getElementById('playPauseText'),
+        resetAnimBtn: document.getElementById('resetAnimBtn'),
+        animSpeedSelect: document.getElementById('animSpeedSelect'),
+        animScaleSelect: document.getElementById('animScaleSelect'),
+        timeScrubber: document.getElementById('timeScrubber'),
+        scrubberTime: document.getElementById('scrubberTime'),
+        scrubberMax: document.getElementById('scrubberMax'),
+        scrubberIdx: document.getElementById('scrubberIdx'),
+        scrubberEndLabel: document.getElementById('scrubberEndLabel'),
+        liveTime: document.getElementById('liveTime'),
+        liveRoofFom: document.getElementById('liveRoofFom'),
+        liveRoofRom: document.getElementById('liveRoofRom'),
+        liveAgVal: document.getElementById('liveAgVal'),
+
+        // Plots titles
+        titlePlotRoof: document.getElementById('titlePlotRoof'),
+        titlePlotMid: document.getElementById('titlePlotMid'),
+
+        // Reports
+        tabExecBtn: document.getElementById('tabExecBtn'),
+        tabTechBtn: document.getElementById('tabTechBtn'),
+        tabExecPanel: document.getElementById('tabExecPanel'),
+        tabTechPanel: document.getElementById('tabTechPanel'),
+        execSubtitle: document.getElementById('execSubtitle'),
+        execBlock1: document.getElementById('execBlock1'),
+        execBlock2: document.getElementById('execBlock2'),
+        execBlock3: document.getElementById('execBlock3'),
+        execBlock4: document.getElementById('execBlock4'),
+        execCard4: document.getElementById('execCard4'),
+        techMetricsTable: document.getElementById('techMetricsTable'),
+        techParamsTable: document.getElementById('techParamsTable'),
+      };
+
+      // =====================================================================
+      // 8. NOTIFICACIONES TOAST (SIN ALERT/CONFIRM)
+      // =====================================================================
+
+      function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const colorClasses =
+          type === 'success'
+            ? 'bg-emerald-600 text-white'
+            : type === 'warning'
+            ? 'bg-amber-600 text-white'
+            : 'bg-slate-900 dark:bg-slate-800 text-white border border-slate-700';
+
+        toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg flex items-center gap-2 transition-all duration-300 translate-y-2 opacity-0 ${colorClasses}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        requestAnimationFrame(() => {
+          toast.classList.remove('translate-y-2', 'opacity-0');
+        });
+
+        setTimeout(() => {
+          toast.classList.add('translate-y-2', 'opacity-0');
+          setTimeout(() => toast.remove(), 300);
+        }, 2800);
+      }
+
+      // =====================================================================
+      // 9. SINCRONIZACIÓN DE CONTROLES Y SELECTOR DE PISO INTERMEDIO
+      // =====================================================================
+
+      function populateMidFloorSelect(nFloors, preferredFloor) {
+        const select = els.midFloorSelect;
+        const current = preferredFloor || Math.floor(nFloors / 2);
+        const clamped = Math.max(1, Math.min(nFloors - 1, current));
+        select.innerHTML = '';
+        for (let i = 1; i < nFloors; i++) {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = `Piso ${i}`;
+          if (i === clamped) opt.selected = true;
+          select.appendChild(opt);
+        }
+        state.params.mid_floor = clamped;
+      }
+
+      function readParamsFromUI() {
+        const nFloors = Math.max(5, Math.min(30, parseInt(els.nFloorsNum.value, 10) || 20));
+        const massT = Math.max(20, Math.min(120, parseFloat(els.massNum.value) || 50));
+        const stiffMn = Math.max(2.0, Math.min(15.0, parseFloat(els.stiffnessNum.value) || 7.5));
+        const dampPct = Math.max(0.1, Math.min(10.0, parseFloat(els.dampingNum.value) || 0.47));
+        const intensity = Math.max(0.05, Math.min(0.60, parseFloat(els.intensityNum.value) || 0.18));
+        const tf = Math.max(10, Math.min(30, parseFloat(els.tfNum.value) || 20));
+        const energyPct = Math.max(90.0, Math.min(99.99, parseFloat(els.energyNum.value) || 99.0));
+
+        if (els.midFloorSelect.options.length !== nFloors - 1) {
+          populateMidFloorSelect(nFloors, Math.floor(nFloors / 2));
+        }
+        const midFloor = Math.max(1, Math.min(nFloors - 1, parseInt(els.midFloorSelect.value, 10) || Math.floor(nFloors / 2)));
+
+        state.params = {
+          n_floors: nFloors,
+          mass_per_floor: massT * 1000.0,
+          stiffness: stiffMn * 1e6,
+          damping_ratio: dampPct / 100.0,
+          intensity: intensity,
+          t0: 0.0,
+          tf: tf,
+          n_times: 500,
+          energy_threshold: energyPct / 100.0,
+          mid_floor: midFloor,
+        };
+      }
+
+      // =====================================================================
+      // 10. EJECUCIÓN DE LA SIMULACIÓN COMPLETA + SVD + ROM
+      // =====================================================================
+
+      function runSimulation() {
+        try {
+          readParamsFromUI();
+          const p = state.params;
+
+          // 1. Matrices estructurales
+          const matrices = buildStructuralMatrices(p);
+
+          // 2. Simulación Modelo Completo (FOM)
+          const fom = simulateFull(p, matrices);
+
+          // 3. Descomposición SVD/POD
+          const svd = computeSvdPod(fom.U_full, p.n_floors, p.n_times, p.energy_threshold);
+
+          // 4. Simulación Modelo de Orden Reducido (ROM)
+          const rom = simulateRom(p, matrices, svd.U_k, svd.k, fom.subSteps, fom.h);
+
+          // 5. Métricas
+          const metrics = computeMetrics(fom.U_full, rom.U_rom, p.n_floors, p.n_times);
+          const speedup = rom.runtimeMs > 0.005 ? fom.runtimeMs / rom.runtimeMs : fom.runtimeMs / 0.01;
+
+          // Precomputar máximo global de desplazamiento para escala automática en Canvas
+          let maxGlobalDispM = 0;
+          for (let i = 0; i < fom.U_full.length; i++) {
+            const v = Math.abs(fom.U_full[i]);
+            if (v > maxGlobalDispM) maxGlobalDispM = v;
+          }
+
+          state.result = {
+            params: { ...p },
+            matrices,
+            t: fom.t,
+            ag: fom.ag,
+            U_full: fom.U_full,
+            U_rom: rom.U_rom,
+            timeFullMs: fom.runtimeMs,
+            timeRomMs: rom.runtimeMs,
+            speedup,
+            svd,
+            metrics,
+            maxGlobalDispM: Math.max(maxGlobalDispM, 1e-4),
+          };
+
+          // Actualizar UI
+          updateKPIs();
+          updateReports();
+          renderAllPlots();
+
+          // Reiniciar barra de tiempo de animación si excede
+          els.timeScrubber.max = p.n_times - 1;
+          els.scrubberMax.textContent = p.tf.toFixed(2);
+          els.scrubberEndLabel.textContent = `${p.tf.toFixed(1)} s`;
+          if (state.anim.frameFloat >= p.n_times) state.anim.frameFloat = 0;
+
+          drawAnimationFrame();
+        } catch (err) {
+          console.error('Error en simulación:', err);
+          showToast('Error numérico en la simulación. Verifique los parámetros.', 'warning');
+        }
+      }
+
+      // =====================================================================
+      // 11. ACTUALIZACIÓN DE TARJETAS KPI Y REPORTES
+      // =====================================================================
+
+      function updateKPIs() {
+        const { params: p, svd, metrics, timeFullMs, timeRomMs, speedup } = state.result;
+        const capturedPct = svd.energy[svd.k - 1] * 100.0;
+
+        els.kpiModes.textContent = `${p.n_floors} → ${svd.k} modos`;
+        els.kpiEnergy.textContent = `Energía capturada: ${capturedPct.toFixed(2)}%`;
+
+        els.kpiAccuracy.textContent = `${metrics.accuracyPct.toFixed(2)}%`;
+        els.kpiRelErr.textContent = `Error rel: ${metrics.relErrorPct.toFixed(4)}%`;
+
+        els.kpiSpeedup.textContent = `${speedup.toFixed(2)}x`;
+        els.kpiTimes.textContent = `FOM ${timeFullMs.toFixed(1)}ms vs ROM ${timeRomMs.toFixed(1)}ms`;
+
+        els.kpiMaxDisp.textContent = `${metrics.maxRoofMm.toFixed(1)} mm`;
+
+        const isSafe = metrics.maxRoofMm < 150.0;
+        if (isSafe) {
+          els.kpiStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide mt-0.5 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+          els.kpiStatusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> SEGURO / CONTROLADO`;
+          els.kpiStatusDesc.textContent = 'Oscilación dentro de límites elásticos (< 150 mm).';
+        } else {
+          els.kpiStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide mt-0.5 bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800';
+          els.kpiStatusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> ALERTA DE INSPECCIÓN`;
+          els.kpiStatusDesc.textContent = 'Deformación alta (≥ 150 mm). Revisar vigas/columnas.';
+        }
+      }
+
+      function updateReports() {
+        const { params: p, matrices, svd, metrics, timeFullMs, timeRomMs, speedup } = state.result;
+        const capturedPct = svd.energy[svd.k - 1] * 100.0;
+        const isSafe = metrics.maxRoofMm < 150.0;
+
+        // --- Reporte Ejecutivo (Bloque B) ---
+        els.execSubtitle.textContent = `Edificio Residencial de ${p.n_floors} Pisos · Duración del evento: ${p.tf.toFixed(0)} segundos`;
+
+        els.execBlock1.innerHTML = `
+          <li>Analizó cómo se sacude un edificio de <strong>${p.n_floors} pisos</strong> durante un sismo de <strong>${p.tf.toFixed(0)} segundos</strong>.</li>
+          <li>La computadora normalmente tendría que resolver <strong>${p.n_floors} ecuaciones diferenciales</strong> acopladas a la vez.</li>
+          <li>Con el método SVD/POD, redujo todo el problema a solo <strong>${svd.k} movimientos clave</strong> (modos dominantes).</li>
+        `;
+
+        els.execBlock2.innerHTML = `
+          <li>Método tradicional completo (FOM): <span class="font-mono font-semibold">${(timeFullMs / 1000).toFixed(4)} s</span> (${timeFullMs.toFixed(1)} ms).</li>
+          <li>Método reducido inteligente (ROM): <span class="font-mono font-semibold">${(timeRomMs / 1000).toFixed(4)} s</span> (${timeRomMs.toFixed(1)} ms).</li>
+          <li><strong>Conclusión:</strong> El sistema reducido es <strong>${speedup.toFixed(2)} veces más rápido</strong>, permitiendo vigilancia estructural en vivo.</li>
+        `;
+
+        els.execBlock3.innerHTML = `
+          <li>Movimiento capturado: <strong>${capturedPct.toFixed(2)}%</strong> de la energía de vibración total del edificio.</li>
+          <li>Precisión del cálculo: <strong>${metrics.accuracyPct.toFixed(2)}%</strong> idéntico a la simulación física completa.</li>
+          <li>Margen de diferencia RMS: Apenas <strong>${metrics.rmsMm.toFixed(2)} mm</strong> en promedio (insignificante para una estructura de ${p.n_floors} pisos).</li>
+        `;
+
+        els.execCard4.className = isSafe
+          ? 'p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60'
+          : 'p-4 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-800/60';
+
+        els.execBlock4.innerHTML = `
+          <p>Sacudida máxima registrada en la azotea (Piso ${p.n_floors}): <strong class="font-mono">${metrics.maxRoofMm.toFixed(1)} mm</strong>.</p>
+          <p class="font-bold ${isSafe ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}">
+            Diagnóstico de Daño: ${isSafe ? '[ SEGURO / CONTROLADO ]' : '[ ALERTA DE INSPECCIÓN ]'}
+          </p>
+          <p class="text-xs leading-relaxed">
+            ${
+              isSafe
+                ? 'El edificio osciló dentro de los límites elásticos normales (< 150 mm). No hay riesgo de colapso ni daño estructural severo.'
+                : 'Se registraron deformaciones laterales altas (≥ 150 mm). Se recomienda activar protocolo de seguridad y enviar cuadrillas a inspeccionar vigas y nodos.'
+            }
+          </p>
+        `;
+
+        // --- Reporte Técnico (Bloque A) ---
+        const topSingular = Array.from(svd.singularValues.slice(0, svd.k))
+          .map((v) => v.toFixed(4))
+          .join(', ');
+
+        const f1Hz = matrices.w1 / (2 * Math.PI);
+        const f2Hz = matrices.w2 / (2 * Math.PI);
+
+        els.techMetricsTable.innerHTML = `
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Dimensiones Sistema Original (FOM)</td><td class="px-3.5 py-2 text-right font-semibold">${p.n_floors} EDOs (2.° orden)</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Dimensiones Sistema Reducido (ROM)</td><td class="px-3.5 py-2 text-right font-semibold text-blue-600 dark:text-blue-400">${svd.k} modos dominantes</td></tr>
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Energía Acumulada Capturada</td><td class="px-3.5 py-2 text-right font-semibold">${capturedPct.toFixed(3)}%</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Error Cuadrático Medio (RMS)</td><td class="px-3.5 py-2 text-right font-semibold">${metrics.rmsM.toExponential(4)} m (${metrics.rmsMm.toFixed(3)} mm)</td></tr>
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Error Relativo Global (Norma Frobenius)</td><td class="px-3.5 py-2 text-right font-semibold">${metrics.relErrorPct.toFixed(4)}%</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Tiempo de Cómputo FOM / ROM</td><td class="px-3.5 py-2 text-right font-semibold">${timeFullMs.toFixed(2)} ms / ${timeRomMs.toFixed(2)} ms</td></tr>
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Aceleración Alcanzada (Speed-up)</td><td class="px-3.5 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">${speedup.toFixed(2)}x</td></tr>
+        `;
+
+        els.techParamsTable.innerHTML = `
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Masa / Rigidez por piso</td><td class="px-3.5 py-2 text-right font-semibold">${(p.mass_per_floor / 1000).toFixed(0)} t · ${(p.stiffness / 1e6).toFixed(1)} MN/m</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Amortiguamiento crítico (ζ)</td><td class="px-3.5 py-2 text-right font-semibold">${(p.damping_ratio * 100).toFixed(2)}%</td></tr>
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Frecuencia Fundamental (ω₁)</td><td class="px-3.5 py-2 text-right font-semibold">${matrices.w1.toFixed(3)} rad/s (${f1Hz.toFixed(3)} Hz)</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Segunda Frecuencia (ω₂)</td><td class="px-3.5 py-2 text-right font-semibold">${matrices.w2.toFixed(3)} rad/s (${f2Hz.toFixed(3)} Hz)</td></tr>
+          <tr class="bg-slate-50/60 dark:bg-slate-800/40"><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Coeficientes Rayleigh (a₀, a₁)</td><td class="px-3.5 py-2 text-right font-semibold">${matrices.a0.toExponential(3)}, ${matrices.a1.toExponential(3)}</td></tr>
+          <tr><td class="px-3.5 py-2 text-slate-500 dark:text-slate-400">Valores Singulares Principales (σ₁..σₖ)</td><td class="px-3.5 py-2 text-right font-semibold break-all">[${topSingular}]</td></tr>
+        `;
+      }
+
+      // =====================================================================
+      // 12. GRÁFICAS CIENTÍFICAS INTERACTIVAS CON PLOTLY.JS
+      // =====================================================================
+
+      function getPlotlyTheme() {
+        const dark = state.isDark;
+        return {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: dark ? '#0f172a' : '#f8fafc',
+          font: {
+            family: 'Inter, system-ui, sans-serif',
+            color: dark ? '#cbd5e1' : '#334155',
+            size: 11,
+          },
+          gridcolor: dark ? '#1e293b' : '#e2e8f0',
+          zerolinecolor: dark ? '#334155' : '#cbd5e1',
+        };
+      }
+
+      function renderAllPlots() {
+        if (!state.result) return;
+        const { params: p, t, U_full, U_rom, svd } = state.result;
+        const n = p.n_floors;
+        const nTimes = p.n_times;
+        const theme = getPlotlyTheme();
+
+        const plotlyConfig = {
+          responsive: true,
+          displaylogo: false,
+          modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+          toImageButtonOptions: {
+            format: 'png',
+            scale: 2,
+          },
+        };
+
+        const tArray = Array.from(t);
+
+        // --- 1. Espectro Singular y Energía Acumulada ---
+        const modesX = Array.from({ length: n }, (_, i) => i + 1);
+        const sVals = Array.from(svd.singularValues);
+        const energyPct = Array.from(svd.energy).map((e) => e * 100.0);
+
+        const traceSigma = {
+          x: modesX,
+          y: sVals,
+          name: 'Valor singular σᵢ',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#2563eb', width: 2 },
+          marker: { size: 6, color: '#2563eb' },
+        };
+
+        const traceEnergy = {
+          x: modesX,
+          y: energyPct,
+          name: 'Energía Acum. (%)',
+          yaxis: 'y2',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#10b981', width: 2 },
+          marker: { symbol: 'triangle-up', size: 6, color: '#10b981' },
+        };
+
+        const layoutSvd = {
+          paper_bgcolor: theme.paper_bgcolor,
+          plot_bgcolor: theme.plot_bgcolor,
+          font: theme.font,
+          margin: { l: 55, r: 55, t: 20, b: 45 },
+          xaxis: { title: 'Modo i', dtick: n <= 15 ? 1 : 2, gridcolor: theme.gridcolor },
+          yaxis: { title: 'Valor singular σᵢ', gridcolor: theme.gridcolor, zerolinecolor: theme.zerolinecolor },
+          yaxis2: {
+            title: 'Energía Acumulada (%)',
+            overlaying: 'y',
+            side: 'right',
+            range: [0, 105],
+            showgrid: false,
+          },
+          legend: { orientation: 'h', y: 1.12, x: 0 },
+          shapes: [
+            {
+              type: 'line',
+              x0: svd.k,
+              x1: svd.k,
+              y0: 0,
+              y1: 1,
+              yref: 'paper',
+              line: { color: '#ef4444', width: 2, dash: 'dash' },
+            },
+            {
+              type: 'line',
+              x0: 1,
+              x1: n,
+              y0: p.energy_threshold * 100,
+              y1: p.energy_threshold * 100,
+              yref: 'y2',
+              line: { color: '#94a3b8', width: 1.5, dash: 'dot' },
+            },
+          ],
+          annotations: [
+            {
+              x: svd.k,
+              y: 0.92,
+              yref: 'paper',
+              text: `Corte k=${svd.k}`,
+              showarrow: true,
+              arrowhead: 2,
+              ax: 32,
+              ay: 0,
+              font: { color: '#ef4444', size: 11, family: 'JetBrains Mono' },
+            },
+          ],
+        };
+
+        Plotly.react('plotSvd', [traceSigma, traceEnergy], layoutSvd, {
+          ...plotlyConfig,
+          toImageButtonOptions: { format: 'png', filename: 'espectro_svd_energia', scale: 2 },
+        });
+
+        // --- 2. Respuesta Temporal en Azotea (Último Piso) ---
+        els.titlePlotRoof.textContent = `2. Respuesta Temporal en la Azotea (Piso ${n})`;
+        const roofFomMm = [];
+        const roofRomMm = [];
+        const roofOff = (n - 1) * nTimes;
+        for (let j = 0; j < nTimes; j++) {
+          roofFomMm.push(U_full[roofOff + j] * 1000.0);
+          roofRomMm.push(U_rom[roofOff + j] * 1000.0);
+        }
+
+        const layoutRoof = {
+          paper_bgcolor: theme.paper_bgcolor,
+          plot_bgcolor: theme.plot_bgcolor,
+          font: theme.font,
+          margin: { l: 55, r: 20, t: 20, b: 45 },
+          xaxis: { title: 'Tiempo t (s)', gridcolor: theme.gridcolor },
+          yaxis: { title: 'Desplazamiento (mm)', gridcolor: theme.gridcolor, zerolinecolor: theme.zerolinecolor },
+          legend: { orientation: 'h', y: 1.12, x: 0 },
+        };
+
+        Plotly.react(
+          'plotRoof',
+          [
+            { x: tArray, y: roofFomMm, name: `Piso ${n} (Completo)`, type: 'scatter', mode: 'lines', line: { color: '#2563eb', width: 2 } },
+            { x: tArray, y: roofRomMm, name: `Piso ${n} (ROM k=${svd.k})`, type: 'scatter', mode: 'lines', line: { color: '#ef4444', width: 2, dash: 'dash' } },
+          ],
+          layoutRoof,
+          { ...plotlyConfig, toImageButtonOptions: { format: 'png', filename: `respuesta_azotea_piso_${n}`, scale: 2 } }
+        );
+
+        // --- 3. Respuesta Temporal en Piso Intermedio ---
+        const midFloor = p.mid_floor;
+        els.titlePlotMid.textContent = `3. Respuesta Temporal a Media Altura (Piso ${midFloor})`;
+        const midFomMm = [];
+        const midRomMm = [];
+        const midOff = (midFloor - 1) * nTimes;
+        for (let j = 0; j < nTimes; j++) {
+          midFomMm.push(U_full[midOff + j] * 1000.0);
+          midRomMm.push(U_rom[midOff + j] * 1000.0);
+        }
+
+        Plotly.react(
+          'plotMid',
+          [
+            { x: tArray, y: midFomMm, name: `Piso ${midFloor} (Completo)`, type: 'scatter', mode: 'lines', line: { color: '#2563eb', width: 2 } },
+            { x: tArray, y: midRomMm, name: `Piso ${midFloor} (ROM k=${svd.k})`, type: 'scatter', mode: 'lines', line: { color: '#a855f7', width: 2, dash: 'dash' } },
+          ],
+          layoutRoof,
+          { ...plotlyConfig, toImageButtonOptions: { format: 'png', filename: `respuesta_piso_${midFloor}`, scale: 2 } }
+        );
+
+        // --- 4. Mapa de Calor Espaciotemporal del Error Absoluto ---
+        const zError = [];
+        const yFloors = [];
+        for (let i = 0; i < n; i++) {
+          yFloors.push(i + 1);
+          const row = [];
+          const off = i * nTimes;
+          for (let j = 0; j < nTimes; j++) {
+            row.push(Math.abs(U_full[off + j] - U_rom[off + j]) * 1000.0);
+          }
+          zError.push(row);
+        }
+
+        const layoutError = {
+          paper_bgcolor: theme.paper_bgcolor,
+          plot_bgcolor: theme.plot_bgcolor,
+          font: theme.font,
+          margin: { l: 55, r: 20, t: 20, b: 45 },
+          xaxis: { title: 'Tiempo t (s)', gridcolor: theme.gridcolor },
+          yaxis: { title: 'Nivel de Piso', gridcolor: theme.gridcolor },
+        };
+
+        Plotly.react(
+          'plotError',
+          [
+            {
+              z: zError,
+              x: tArray,
+              y: yFloors,
+              type: 'heatmap',
+              colorscale: 'Viridis',
+              colorbar: {
+                title: 'Error (mm)',
+                titleside: 'right',
+                thickness: 14,
+              },
+            },
+          ],
+          layoutError,
+          { ...plotlyConfig, toImageButtonOptions: { format: 'png', filename: 'mapa_error_residual_svd', scale: 2 } }
+        );
+      }
+
+      // =====================================================================
+      // 13. ANIMACIÓN 2D DEL EDIFICIO Y SEÑAL SÍSMICA EN CANVAS HTML5
+      // =====================================================================
+
+      function setupHiDpiCanvas(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(1, Math.floor(rect.width));
+        const h = Math.max(1, Math.floor(rect.height));
+        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+          canvas.width = w * dpr;
+          canvas.height = h * dpr;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { ctx, w, h };
+      }
+
+      function drawAnimationFrame() {
+        if (!state.result) return;
+        const { params: p, t, ag, U_full, U_rom, maxGlobalDispM } = state.result;
+        const n = p.n_floors;
+        const nTimes = p.n_times;
+        const idx = Math.max(0, Math.min(nTimes - 1, Math.floor(state.anim.frameFloat)));
+
+        // Actualizar textos en vivo
+        const currT = t[idx];
+        const roofFom = U_full[(n - 1) * nTimes + idx] * 1000.0;
+        const roofRom = U_rom[(n - 1) * nTimes + idx] * 1000.0;
+        const currAg = ag[idx];
+
+        els.liveTime.textContent = currT.toFixed(2);
+        els.liveRoofFom.textContent = roofFom.toFixed(1);
+        els.liveRoofRom.textContent = roofRom.toFixed(1);
+        els.liveAgVal.textContent = `${currAg.toFixed(3)} m/s²`;
+        els.scrubberTime.textContent = currT.toFixed(2);
+        els.scrubberIdx.textContent = idx + 1;
+        els.timeScrubber.value = idx;
+
+        // --- A) Dibujo del Edificio 2D ---
+        const { ctx, w, h } = setupHiDpiCanvas(els.buildingCanvas);
+        const dark = state.isDark;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Cuadrícula de ingeniería de fondo
+        ctx.strokeStyle = dark ? 'rgba(51, 65, 85, 0.35)' : 'rgba(203, 213, 225, 0.55)';
+        ctx.lineWidth = 1;
+        const gridStep = 24;
+        for (let gx = 0; gx < w; gx += gridStep) {
+          ctx.beginPath();
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, h);
+          ctx.stroke();
+        }
+        for (let gy = 0; gy < h; gy += gridStep) {
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(w, gy);
+          ctx.stroke();
+        }
+
+        const groundY = h - 34;
+        const topMargin = 28;
+        const buildingHeight = Math.max(80, groundY - topMargin);
+        const floorH = buildingHeight / n;
+        const bWidth = Math.min(86, w * 0.22);
+        const centerX = w * 0.5;
+
+        // Factor de escala visual (px por metro)
+        const maxPixelSwing = Math.min(w * 0.32, 140);
+        const pxPerMeter =
+          state.anim.scaleMode === 'auto'
+            ? maxPixelSwing / maxGlobalDispM
+            : parseFloat(state.anim.scaleMode);
+
+        // Línea de referencia vertical (eje sin deformar)
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = dark ? '#475569' : '#94a3b8';
+        ctx.beginPath();
+        ctx.moveTo(centerX, topMargin - 10);
+        ctx.lineTo(centerX, groundY);
+        ctx.stroke();
+        ctx.restore();
+
+        // Suelo con ligera vibración proporcional a ag(t)
+        const groundShakePx = Math.max(-8, Math.min(8, currAg * 4.5));
+        ctx.fillStyle = dark ? '#1e293b' : '#cbd5e1';
+        ctx.fillRect(0, groundY, w, h - groundY);
+        ctx.strokeStyle = dark ? '#475569' : '#64748b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, groundY);
+        ctx.lineTo(w, groundY);
+        ctx.stroke();
+
+        // Pequeñas marcas de terreno
+        ctx.strokeStyle = dark ? '#334155' : '#94a3b8';
+        ctx.lineWidth = 1;
+        for (let x = -20 + groundShakePx; x < w + 20; x += 18) {
+          ctx.beginPath();
+          ctx.moveTo(x, groundY);
+          ctx.lineTo(x - 8, groundY + 12);
+          ctx.stroke();
+        }
+
+        // Función auxiliar para dibujar la estructura deformada
+        function drawBuilding(U_data, strokeColor, fillColor, isDashed) {
+          ctx.save();
+          if (isDashed) ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = isDashed ? 2 : 2.2;
+
+          let prevX = centerX;
+          let prevY = groundY;
+
+          for (let i = 0; i < n; i++) {
+            const dispM = U_data[i * nTimes + idx];
+            const currX = centerX + dispM * pxPerMeter;
+            const currY = groundY - (i + 1) * floorH;
+
+            // Relleno sutil del piso (solo FOM)
+            if (fillColor) {
+              ctx.fillStyle = fillColor;
+              ctx.beginPath();
+              ctx.moveTo(prevX - bWidth / 2, prevY);
+              ctx.lineTo(prevX + bWidth / 2, prevY);
+              ctx.lineTo(currX + bWidth / 2, currY);
+              ctx.lineTo(currX - bWidth / 2, currY);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Columnas izquierda y derecha
+            ctx.beginPath();
+            ctx.moveTo(prevX - bWidth / 2, prevY);
+            ctx.lineTo(currX - bWidth / 2, currY);
+            ctx.moveTo(prevX + bWidth / 2, prevY);
+            ctx.lineTo(currX + bWidth / 2, currY);
+            ctx.stroke();
+
+            // Losa del piso
+            ctx.beginPath();
+            ctx.moveTo(currX - bWidth / 2 - 2, currY);
+            ctx.lineTo(currX + bWidth / 2 + 2, currY);
+            ctx.stroke();
+
+            prevX = currX;
+            prevY = currY;
+          }
+
+          // Etiqueta de azotea en el FOM
+          if (!isDashed) {
+            ctx.fillStyle = dark ? '#93c5fd' : '#1d4ed8';
+            ctx.font = '600 10px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`P${n}`, prevX, prevY - 6);
+          }
+
+          ctx.restore();
+        }
+
+        // Dibujar FOM (azul) y luego ROM (rojo punteado) encima
+        drawBuilding(U_full, '#2563eb', dark ? 'rgba(37, 99, 235, 0.14)' : 'rgba(37, 99, 235, 0.10)', false);
+        drawBuilding(U_rom, '#ef4444', null, true);
+
+        // --- B) Dibujo de la mini-gráfica de Aceleración del Suelo ag(t) ---
+        const { ctx: actx, w: aw, h: ah } = setupHiDpiCanvas(els.accelCanvas);
+        actx.clearRect(0, 0, aw, ah);
+
+        const padL = 12, padR = 12, padT = 16, padB = 16;
+        const plotW = aw - padL - padR;
+        const plotH = ah - padT - padB;
+        const midY = padT + plotH / 2;
+
+        let maxAg = 0.01;
+        for (let j = 0; j < nTimes; j++) {
+          const v = Math.abs(ag[j]);
+          if (v > maxAg) maxAg = v;
+        }
+
+        // Eje cero
+        actx.strokeStyle = dark ? '#334155' : '#cbd5e1';
+        actx.lineWidth = 1;
+        actx.beginPath();
+        actx.moveTo(padL, midY);
+        actx.lineTo(aw - padR, midY);
+        actx.stroke();
+
+        // Curva ag(t)
+        actx.strokeStyle = dark ? '#f59e0b' : '#d97706';
+        actx.lineWidth = 1.6;
+        actx.beginPath();
+        for (let j = 0; j < nTimes; j++) {
+          const x = padL + (j / (nTimes - 1)) * plotW;
+          const y = midY - (ag[j] / maxAg) * (plotH * 0.45);
+          if (j === 0) actx.moveTo(x, y);
+          else actx.lineTo(x, y);
+        }
+        actx.stroke();
+
+        // Cursor del instante actual
+        const cursorX = padL + (idx / (nTimes - 1)) * plotW;
+        const cursorY = midY - (currAg / maxAg) * (plotH * 0.45);
+
+        actx.strokeStyle = '#ef4444';
+        actx.lineWidth = 1.5;
+        actx.beginPath();
+        actx.moveTo(cursorX, padT);
+        actx.lineTo(cursorX, ah - padB);
+        actx.stroke();
+
+        actx.fillStyle = '#ef4444';
+        actx.beginPath();
+        actx.arc(cursorX, cursorY, 4, 0, Math.PI * 2);
+        actx.fill();
+      }
+
+      function animationLoop(timestamp) {
+        if (state.anim.lastTimestamp === null) {
+          state.anim.lastTimestamp = timestamp;
+        }
+        const dtSec = Math.min(0.1, (timestamp - state.anim.lastTimestamp) / 1000.0);
+        state.anim.lastTimestamp = timestamp;
+
+        if (state.anim.playing && state.result) {
+          const p = state.result.params;
+          const framesPerSec = (p.n_times - 1) / p.tf;
+          state.anim.frameFloat += dtSec * framesPerSec * state.anim.speed;
+          if (state.anim.frameFloat >= p.n_times) {
+            state.anim.frameFloat = 0;
+          }
+          drawAnimationFrame();
+        }
+
+        requestAnimationFrame(animationLoop);
+      }
+
+      // =====================================================================
+      // 14. EXPORTACIÓN A CSV
+      // =====================================================================
+
+      function exportCsv() {
+        if (!state.result) return;
+        const { params: p, t, U_full } = state.result;
+        const n = p.n_floors;
+        const nTimes = p.n_times;
+
+        const headers = ['t'];
+        for (let i = 1; i <= n; i++) headers.push(`u_piso_${i}`);
+
+        const lines = [headers.join(',')];
+        for (let j = 0; j < nTimes; j++) {
+          const row = [t[j].toFixed(6)];
+          for (let i = 0; i < n; i++) {
+            row.push(U_full[i * nTimes + j].toExponential(6));
+          }
+          lines.push(row.join(','));
+        }
+
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'datos_edificio_sismo.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast('Archivo datos_edificio_sismo.csv descargado.', 'success');
+      }
+
+      // =====================================================================
+      // 15. EVENT LISTENERS E INTERACCIONES
+      // =====================================================================
+
+      let debounceTimer = null;
+      function scheduleAutoRun() {
+        if (!els.autoRunToggle.checked) return;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(runSimulation, 120);
+      }
+
+      function bindRangeAndNumber(rangeEl, numEl, onChangeExtra) {
+        rangeEl.addEventListener('input', () => {
+          numEl.value = rangeEl.value;
+          if (onChangeExtra) onChangeExtra();
+          scheduleAutoRun();
+        });
+        numEl.addEventListener('input', () => {
+          rangeEl.value = numEl.value;
+          if (onChangeExtra) onChangeExtra();
+          scheduleAutoRun();
+        });
+      }
+
+      bindRangeAndNumber(els.nFloorsRange, els.nFloorsNum, () => {
+        const n = Math.max(5, Math.min(30, parseInt(els.nFloorsNum.value, 10) || 20));
+        populateMidFloorSelect(n, Math.floor(n / 2));
+      });
+      bindRangeAndNumber(els.massRange, els.massNum);
+      bindRangeAndNumber(els.stiffnessRange, els.stiffnessNum);
+      bindRangeAndNumber(els.dampingRange, els.dampingNum);
+      bindRangeAndNumber(els.intensityRange, els.intensityNum);
+      bindRangeAndNumber(els.tfRange, els.tfNum);
+      bindRangeAndNumber(els.energyRange, els.energyNum);
+
+      els.midFloorSelect.addEventListener('change', () => {
+        if (!state.result) return;
+        state.params.mid_floor = parseInt(els.midFloorSelect.value, 10);
+        state.result.params.mid_floor = state.params.mid_floor;
+        renderAllPlots();
+      });
+
+      // Presets
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-preset');
+          const preset = PRESETS[key];
+          if (!preset) return;
+
+          els.nFloorsNum.value = els.nFloorsRange.value = preset.n_floors;
+          els.massNum.value = els.massRange.value = preset.mass_t;
+          els.stiffnessNum.value = els.stiffnessRange.value = preset.stiffness_mn;
+          els.dampingNum.value = els.dampingRange.value = preset.damping_pct;
+          els.intensityNum.value = els.intensityRange.value = preset.intensity;
+          els.tfNum.value = els.tfRange.value = preset.tf;
+          els.energyNum.value = els.energyRange.value = preset.energy_pct;
+          populateMidFloorSelect(preset.n_floors, Math.floor(preset.n_floors / 2));
+
+          state.anim.frameFloat = 0;
+          runSimulation();
+          showToast(`Escenario cargado: ${preset.name}`, 'info');
+        });
+      });
+
+      els.runSimBtn.addEventListener('click', () => {
+        runSimulation();
+        showToast('Simulación actualizada.', 'success');
+      });
+
+      els.exportCsvBtn.addEventListener('click', exportCsv);
+
+      // Controles de animación
+      function updatePlayPauseUI() {
+        if (state.anim.playing) {
+          els.playIcon.classList.add('hidden');
+          els.pauseIcon.classList.remove('hidden');
+          els.playPauseText.textContent = 'Pausar';
+        } else {
+          els.playIcon.classList.remove('hidden');
+          els.pauseIcon.classList.add('hidden');
+          els.playPauseText.textContent = 'Reproducir';
+        }
+      }
+
+      els.playPauseBtn.addEventListener('click', () => {
+        state.anim.playing = !state.anim.playing;
+        updatePlayPauseUI();
+      });
+
+      els.resetAnimBtn.addEventListener('click', () => {
+        state.anim.frameFloat = 0;
+        drawAnimationFrame();
+      });
+
+      els.animSpeedSelect.addEventListener('change', () => {
+        state.anim.speed = parseFloat(els.animSpeedSelect.value) || 1.0;
+      });
+
+      els.animScaleSelect.addEventListener('change', () => {
+        state.anim.scaleMode = els.animScaleSelect.value;
+        drawAnimationFrame();
+      });
+
+      els.timeScrubber.addEventListener('input', () => {
+        state.anim.frameFloat = parseInt(els.timeScrubber.value, 10) || 0;
+        drawAnimationFrame();
+      });
+
+      // Tabs de Reportes
+      function switchTab(tab) {
+        if (tab === 'exec') {
+          els.tabExecPanel.classList.remove('hidden');
+          els.tabTechPanel.classList.add('hidden');
+          els.tabExecBtn.classList.add('border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+          els.tabExecBtn.classList.remove('border-transparent', 'text-slate-500');
+          els.tabTechBtn.classList.remove('border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+          els.tabTechBtn.classList.add('border-transparent', 'text-slate-500');
+        } else {
+          els.tabTechPanel.classList.remove('hidden');
+          els.tabExecPanel.classList.add('hidden');
+          els.tabTechBtn.classList.add('border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+          els.tabTechBtn.classList.remove('border-transparent', 'text-slate-500');
+          els.tabExecBtn.classList.remove('border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+          els.tabExecBtn.classList.add('border-transparent', 'text-slate-500');
+        }
+      }
+      els.tabExecBtn.addEventListener('click', () => switchTab('exec'));
+      els.tabTechBtn.addEventListener('click', () => switchTab('tech'));
+
+      // Tema Claro / Oscuro
+      els.themeToggleBtn.addEventListener('click', () => {
+        state.isDark = !state.isDark;
+        document.documentElement.classList.toggle('dark', state.isDark);
+        renderAllPlots();
+        drawAnimationFrame();
+      });
+
+      // Sidebar móvil
+      function toggleMobileSidebar(open) {
+        if (open) {
+          els.sidebar.classList.remove('-translate-x-full');
+          els.sidebarBackdrop.classList.remove('hidden');
+        } else {
+          els.sidebar.classList.add('-translate-x-full');
+          els.sidebarBackdrop.classList.add('hidden');
+        }
+      }
+      els.openSidebarBtn.addEventListener('click', () => toggleMobileSidebar(true));
+      els.closeSidebarBtn.addEventListener('click', () => toggleMobileSidebar(false));
+      els.sidebarBackdrop.addEventListener('click', () => toggleMobileSidebar(false));
+
+      // Redimensionamiento responsivo
+      window.addEventListener('resize', () => {
+        drawAnimationFrame();
+      });
+
+      // =====================================================================
+      // 16. INICIALIZACIÓN
+      // =====================================================================
+      window.addEventListener('load', () => {
+        populateMidFloorSelect(20, 10);
+        runSimulation();
+        requestAnimationFrame(animationLoop);
+      });
+    })();
+  </script>
+</body>
+</html>
